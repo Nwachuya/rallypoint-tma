@@ -20,7 +20,6 @@ bot.setWebHook(`${process.env.WEBHOOK_URL}/webhook`);
 
 // Webhook endpoint
 app.post('/webhook', (req, res) => {
-    console.log('Webhook received:', JSON.stringify(req.body, null, 2));
     bot.processUpdate(req.body);
     res.sendStatus(200);
 });
@@ -34,87 +33,51 @@ bot.onText(/\/plan/, (msg) => {
             inline_keyboard: [[
                 {
                     text: "Create Event",
-                    switch_inline_query_current_chat: "create_event"
+                    web_app: { url: MINI_APP_URL }
                 }
             ]]
         }
     });
 });
 
-// Handle inline queries
-bot.on('inline_query', async (query) => {
-    const queryText = query.query;
-    console.log('Inline query:', queryText);
+// Handle web app data (THIS IS THE CRITICAL PART)
+bot.on('web_app_data', async (msg) => {
+    const chatId = msg.message.chat.id;
+    const userId = msg.from.id;
+    const userName = msg.from.first_name || 'User';
     
-    if (queryText === 'create_event') {
-        const results = [{
-            type: 'article',
-            id: '1',
-            title: '🎯 Create New Event',
-            description: 'Plan an event with multiple time options',
-            input_message_content: {
-                message_text: 'Opening event planner...'
-            },
-            reply_markup: {
-                inline_keyboard: [[
-                    {
-                        text: "📝 Plan Event",
-                        web_app: { url: MINI_APP_URL }
-                    }
-                ]]
-            }
-        }];
+    try {
+        const data = JSON.parse(msg.web_app_data.data);
+        const { title, options } = data;
         
-        await bot.answerInlineQuery(query.id, results, {
-            cache_time: 0,
-            is_personal: true
+        // Create poll message
+        const pollId = `poll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Initialize poll data
+        activePolls.set(pollId, {
+            title,
+            options: options.map(option => ({ text: option, voters: [] })),
+            createdBy: userName,
+            chatId
         });
-    }
-});
-
-// Handle Mini App data
-bot.on('message', async (msg) => {
-    if (msg.web_app_data) {
-        console.log('Web app data received:', msg.web_app_data.data);
-        const chatId = msg.chat.id;
-        const userId = msg.from.id;
-        const userName = msg.from.first_name || 'User';
         
-        try {
-            const data = JSON.parse(msg.web_app_data.data);
-            const { title, options } = data;
-            
-            // Create poll message
-            const pollId = `poll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            // Initialize poll data
-            activePolls.set(pollId, {
-                title,
-                options: options.map(option => ({ text: option, voters: [] })),
-                createdBy: userName,
-                chatId
-            });
-            
-            // Create inline keyboard for voting
-            const keyboard = options.map((option, index) => [{
-                text: `${option} (0)`,
-                callback_data: `vote_${pollId}_${index}`
-            }]);
-            
-            const message = `🎯 **${title}**\n\n` +
-                           `Created by ${userName}\n\n` +
-                           `Please vote for your preferred option:`;
-            
-            await bot.sendMessage(chatId, message, {
-                parse_mode: 'Markdown',
-                reply_markup: {
-                    inline_keyboard: keyboard
-                }
-            });
-            
-        } catch (error) {
-            console.error('Error processing web app data:', error);
-        }
+        // Create inline keyboard for voting
+        const keyboard = options.map((option, index) => [{
+            text: `${option} (0)`,
+            callback_data: `vote_${pollId}_${index}`
+        }]);
+        
+        const message = `🎯 **${title}**\n\nCreated by ${userName}\n\nPlease vote for your preferred option:`;
+        
+        await bot.sendMessage(chatId, message, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: keyboard
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error processing web app data:', error);
     }
 });
 
@@ -152,9 +115,7 @@ bot.on('callback_query', async (query) => {
             callback_data: `vote_${pollId}_${index}`
         }]);
         
-        let message = `🎯 **${poll.title}**\n\n` +
-                     `Created by ${poll.createdBy}\n\n` +
-                     `Please vote for your preferred option:\n\n`;
+        let message = `🎯 **${poll.title}**\n\nCreated by ${poll.createdBy}\n\nPlease vote for your preferred option:\n\n`;
         
         // Add vote summary
         poll.options.forEach(option => {
