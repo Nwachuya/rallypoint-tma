@@ -68,17 +68,7 @@ function validateForm() {
 tg.MainButton.onClick(() => {
     const formData = validateForm();
     if (formData) {
-        // Create poll message
-        const pollMessage = `🎯 **${formData.title}**\n\nPlease vote for your preferred option:\n\n${formData.options.map((opt, i) => `${i+1}. ${opt}`).join('\n')}`;
-        
-        tg.answerWebAppQuery(tg.initDataUnsafe.query_id, {
-            type: 'article',
-            id: '1',
-            title: `Event: ${formData.title}`,
-            description: `Created event with ${formData.options.length} options`,
-            message_text: pollMessage,
-            parse_mode: 'Markdown'
-        });
+        tg.sendData(JSON.stringify(formData));
     }
 });
 
@@ -87,7 +77,6 @@ updateRemoveButtons();
 
 // Auto-resize
 function adjustHeight() {
-    const height = document.body.scrollHeight;
     tg.expand();
 }
 
