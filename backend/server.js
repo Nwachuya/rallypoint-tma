@@ -40,59 +40,12 @@ bot.onText(/\/plan/, (msg) => {
     });
 });
 
-// Handle Mini App data
-bot.on('web_app_data', async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const userName = msg.from.first_name || 'User';
-    
-    try {
-        const data = JSON.parse(msg.web_app_data.data);
-        const { title, options } = data;
-        
-        // Create poll message
-        const pollId = `poll_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Initialize poll data
-        activePolls.set(pollId, {
-            title,
-            options: options.map(option => ({ text: option, voters: [] })),
-            createdBy: userName,
-            chatId
-        });
-        
-        // Create inline keyboard for voting
-        const keyboard = options.map((option, index) => [{
-            text: `${option} (0)`,
-            callback_data: `vote_${pollId}_${index}`
-        }]);
-        
-        const message = `🎯 **${title}**\n\n` +
-                       `Created by ${userName}\n\n` +
-                       `Please vote for your preferred option:`;
-        
-        await bot.sendMessage(chatId, message, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: keyboard
-            }
-        });
-        
-        // Confirm to user
-        bot.answerWebAppQuery(msg.web_app_data.query_id, {
-            type: 'article',
-            id: '1',
-            title: 'Event Created!',
-            description: `${title} has been shared with the group`,
-            message_text: 'Event created successfully!'
-        });
-        
-    } catch (error) {
-        console.error('Error processing web app data:', error);
-    }
+// Handle inline query results from Mini App
+bot.on('chosen_inline_result', async (result) => {
+    console.log('Chosen inline result:', result);
 });
 
-// Handle voting
+// Handle callback queries for voting
 bot.on('callback_query', async (query) => {
     const callbackData = query.data;
     
